@@ -1,0 +1,171 @@
+---
+title: "Visualization of Paddy Production, and Salinity Levels in Lower Mekong Delta, Vietnam"
+author:
+name: Huong Nguyen  
+affiliation: AAED Department, Virginia Tech
+
+output: pdf_document
+classoption: landscape
+---
+
+```{r setup, include = FALSE}
+#Include your packages here
+library(rmarkdown)
+options(tinytex.verbose = TRUE)
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+library(tidyverse)
+library(readxl)
+library(openxlsx)
+library(fpp2)
+library(tseries)
+library(lubridate)
+library(tidyverse)
+#library(hrbrthemes)
+library(rgdal)
+library(sf)
+library(viridisLite)
+library(viridis)
+library(Metrics)
+library(MLmetrics)
+library(kableExtra)
+library(scales)
+library(maps) # For map data
+theme_set(theme_classic() + theme(legend.position="bottom") )
+knitr::opts_chunk$set(echo = TRUE, 
+                      message = FALSE,
+                      warning = FALSE, 
+                      fig.height = 3,
+                      out.width="\\textwidth",
+                      fig.align="center") 
+knitr::opts_chunk$set(number_sections = FALSE)
+```
+
+```{r spatialmap, fig.align = "center", fig.cap= "The spatial distribution of salinity level in February in MKD for the period 2000-2020", echo = F} 
+shape_rgdal <- readOGR('~/Downloads/stanford-bq365ww4197-shapefile',layer="bq365ww4197")
+
+shape_sf <- read_sf('~/Downloads/stanford-bq365ww4197-shapefile',layer="bq365ww4197")
+
+district_rgdal <- fortify(shape_rgdal)
+district_sf <- fortify(shape_sf)
+
+district_sf$id <- seq.int(nrow(district_sf)) - 1 
+district_sf <- district_sf %>%
+  mutate(id = as.character(id)) %>%
+  select(id, adm_code, laa, nam, pop) 
+
+district_MD <- district_sf %>%
+  filter(nam == "An Giang" | nam == "Bac Lieu" | nam == "Ben Tre" |
+           nam == "Ca Mau" | nam == "Can Tho" | nam == "Dong Thap" | 
+           nam == "Hau Giang" | nam == "Kien Giang" | nam == "Soc Trang" | 
+           nam == "Tien Giang" | nam == "Tra Vinh" | nam == "Long An" |
+           nam == "Vinh Long") %>%
+  select(id, adm_code, laa, nam, pop) 
+
+MKD <- district_rgdal %>%
+  right_join(district_sf, by = "id") %>%
+  filter(nam == "An Giang" | nam == "Bac Lieu" | nam == "Ben Tre" |
+           nam == "Ca Mau" | nam == "Can Tho" | nam == "Dong Thap" | 
+           nam == "Hau Giang" | nam == "Kien Giang" | nam == "Soc Trang" | 
+           nam == "Tien Giang" | nam == "Tra Vinh" | nam == "Long An" |
+           nam == "Vinh Long") %>%
+  filter(pop > 0)
+
+MKD <- MKD %>%
+  mutate(Subfix = case_when(
+    laa == "Bac Lieu" ~ "City", 
+    laa == "Ben Tre" ~ "City",
+    laa == "Ca Mau" ~ "City",
+    laa == "My Tho" ~ "City",
+    laa == "Rach Gia" ~ "City",
+    laa == "Sa Dec" ~ "City",
+    laa == "Soc Trang" ~ "City",
+    laa == "Tan An" ~ "City",
+    laa == "Vi Thanh" ~ "City",
+    laa == "Vinh Long" ~ "City",
+    laa == "Long Xuyen" ~ "City",
+    laa == "Tra Vinh" ~ "City",
+    laa == "Chau Doc" ~ "City",
+    laa == "Ha Tien" ~ "City",
+    laa == "TP Cao Lanh" ~ "City",
+    laa == "Phu Quoc" ~ "City",
+    laa == "Gia Rai" ~ "Town",
+    laa == "Go Cong" ~ "Town",
+    laa == "Tan Chau" ~ "Town",
+    laa == "Vinh Chau" ~ "Town",
+    TRUE ~ "District")) %>%
+  mutate(District_clean = case_when(
+    laa == "TP Cao Lanh" & nam == "Dong Thap" ~ "Cao Lanh",
+    laa == "TP Hong Ngu" & nam == "Dong Thap" ~ "Hong Ngu",
+    laa == "TP. Hong Ngu" & nam == "Dong Thap" ~ "Hong Ngu",
+    laa == "Mo Cay Bac" & nam == "Ben Tre" ~ "Mo Cay",
+    laa == "Mo Cay Nam" & nam == "Ben Tre" ~ "Mo Cay",
+    laa == "Ngoc Hien" & nam == "Ca Mau" ~ "Nam Can",
+    laa == "Hoa Binh" & nam == "Bac Lieu" ~ "Vinh Loi",
+    laa == "Giang Thanh" & nam == "Kien Giang" ~ "Kien Luong",
+    laa == "Thoi Lai" & nam == "Can Tho" ~ "Co Do",
+    laa == "Nga Bay" & nam == "Hau Giang" ~ "Phung Hiep",
+    laa == "U Minh Thuong" & nam == "Kien Giang" ~ "Vinh Thuan",
+    laa == "Giang Thanh" & nam == "Kien Giang" ~ "Kien Luong",
+    laa == "Kien Tuong" & nam == "Long An" ~ "Moc Hoa",
+    laa == "Chau Thanh" & nam == "Soc Trang" ~ "My Tu",
+    laa == "Tran De" & nam == "Soc Trang" ~ "Long Phu",
+    laa == "My Xuyen" & nam == "Soc Trang" ~ "Long Phu",
+    laa == "Nga Nam" & nam == "Soc Trang" ~ "Thanh Tri",
+    laa == "Binh Tan" & nam == "Vinh Long" ~ "Binh Minh",
+    laa == "Go Cong Dong" & nam == "Tien Giang" ~ "Go Cong",
+    laa == "Go Cong Tay" & nam == "Tien Giang" ~ "Go Cong",
+    laa == "Tan Phu Dong" & nam == "Tien Giang" ~ "Go Cong",
+    TRUE ~ laa)) %>%
+  unite(District_clean, Subfix, col = DIST, sep = " ") %>%
+  unite(DIST, nam, col = DIST, sep = ", ") 
+
+Data_Full <- read_excel("20230531_Processed_Data_Full.xlsx")
+data_full_wgps <- Data_Full %>%
+  full_join(MKD, by = "DIST") %>%
+  filter(YEAR != 2021)
+
+data_full_wgps <- data_full_wgps %>%
+  mutate(Salinity_in_Feb = case_when(
+    SALT_FEB <= 1 ~ 1,
+    SALT_FEB <= 2 ~ 2,
+    SALT_FEB <= 3 ~ 3,
+    SALT_FEB <= 4 ~ 4,
+    SALT_FEB <= 10 ~ 10,
+    TRUE ~ 30))
+    
+labs_plot <- c("<= 1 g/lt.", "1-2 g/lt.", "2-3 g/lt.", "3-4 g/lt.", "4-10 g/lt.", "10-30 g/lt.")
+
+#br2 <- c(0, 3, 5, 7, 9)
+data_yield <- data_full_wgps %>%
+  group_by(YEAR, DIST) %>%
+  mutate(long = mean(long, na.rm = T), lat = mean(lat, na.rm = T)) %>%
+  ungroup() %>%
+  distinct(DIST, YEAR, long, lat, group, Y_PDX, SALT_FEB, Salinity_in_Feb) %>%
+  mutate(Y_PDX_range = case_when(
+    Y_PDX <= 3  ~ "<= 3 t/ha",
+    Y_PDX <= 6  ~ "3-6 t/ha",
+    Y_PDX <= 9  ~ "6-9 t/ha"
+  )) %>%
+  na.omit(Y_PDX)
+
+#labs_plot_yield <- c("<= 3 t/ha", "3-6 t/ha", "6-9 t/ha")
+
+graph_salinity <- data_full_wgps %>%
+  ggplot(aes(x = long, y = lat, group = group, fill = as.factor(Salinity_in_Feb))) +
+  geom_polygon(col = "grey20") +
+  coord_map("polyconic") +
+  theme_void() + 
+  facet_wrap(~YEAR, ncol = 7)  +
+  scale_fill_grey(start = 1, end = 0, na.value = NA, label = labs_plot) +
+  labs(fill = "Salinty in Feb") +
+  theme(legend.position = "bottom")
+print(graph_salinity)
+```
+
+```{r spatialmap2, fig.align = "center", fig.cap= "The spatial distribution of paddy spring yield and salinity level in February in MKD for the period 2000-2020", echo = F}
+graph_salinity + 
+  geom_point(data = data_yield, aes(alpha = as.factor(Y_PDX_range), size = as.factor(Y_PDX_range)), pch = 21, fill = "grey80", col = "black") +
+  scale_size_manual(values = c(1, 2, 3, 4), na.value = NA) +
+  facet_wrap(~YEAR, ncol = 7) +
+  theme(legend.position = "bottom")
+```
