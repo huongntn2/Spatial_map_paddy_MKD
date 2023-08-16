@@ -6,6 +6,7 @@ affiliation: AAED Department, Virginia Tech
 
 output: pdf_document
 classoption: landscape
+geometry: margin=0in
 ---
 
 ```{r setup, include = FALSE}
@@ -30,17 +31,23 @@ library(MLmetrics)
 library(kableExtra)
 library(scales)
 library(maps) # For map data
+library(biscale)
+library(sf)
+library(cowplot)
+library(usmap)
+library(maps)
+library(janitor)
+library(purrr)
 theme_set(theme_classic() + theme(legend.position="bottom") )
 knitr::opts_chunk$set(echo = TRUE, 
                       message = FALSE,
                       warning = FALSE, 
-                      fig.height = 3,
-                      out.width="\\textwidth",
-                      fig.align="center") 
+                      fig.align="center",
+                      global.par = TRUE) 
 knitr::opts_chunk$set(number_sections = FALSE)
 ```
 
-```{r spatialmap, fig.align = "center", fig.cap= "The spatial distribution of salinity level in February in MKD for the period 2000-2020", echo = F} 
+```{r, include=F}
 shape_rgdal <- readOGR('~/Downloads/stanford-bq365ww4197-shapefile',layer="bq365ww4197")
 
 shape_sf <- read_sf('~/Downloads/stanford-bq365ww4197-shapefile',layer="bq365ww4197")
@@ -119,6 +126,9 @@ MKD <- MKD %>%
   unite(District_clean, Subfix, col = DIST, sep = " ") %>%
   unite(DIST, nam, col = DIST, sep = ", ") 
 
+MKD_id <- MKD %>%
+  distinct(adm_code, DIST)
+
 Data_Full <- read_excel("20230531_Processed_Data_Full.xlsx")
 data_full_wgps <- Data_Full %>%
   full_join(MKD, by = "DIST") %>%
@@ -126,46 +136,114 @@ data_full_wgps <- Data_Full %>%
 
 data_full_wgps <- data_full_wgps %>%
   mutate(Salinity_in_Feb = case_when(
-    SALT_FEB <= 1 ~ 1,
-    SALT_FEB <= 2 ~ 2,
-    SALT_FEB <= 3 ~ 3,
-    SALT_FEB <= 4 ~ 4,
-    SALT_FEB <= 10 ~ 10,
-    TRUE ~ 30))
+    SALT_FEB <= 2 ~ 1,
+    SALT_FEB <= 4 ~ 2,
+    SALT_FEB <= 6 ~ 3,
+    SALT_FEB > 6  ~ 4))
     
 labs_plot <- c("<= 1 g/lt.", "1-2 g/lt.", "2-3 g/lt.", "3-4 g/lt.", "4-10 g/lt.", "10-30 g/lt.")
 
 #br2 <- c(0, 3, 5, 7, 9)
-data_yield <- data_full_wgps %>%
-  group_by(YEAR, DIST) %>%
-  mutate(long = mean(long, na.rm = T), lat = mean(lat, na.rm = T)) %>%
-  ungroup() %>%
-  distinct(DIST, YEAR, long, lat, group, Y_PDX, SALT_FEB, Salinity_in_Feb) %>%
+data_full_wgps <- data_full_wgps %>%
+#  group_by(YEAR, DIST) %>%
+#  mutate(long = mean(long, na.rm = T), lat = mean(lat, na.rm = T)) %>%
+#  ungroup() %>%
+#  distinct(DIST, YEAR, long, lat, group, Y_PDX, SALT_FEB, Salinity_in_Feb) %>%
   mutate(Y_PDX_range = case_when(
-    Y_PDX <= 3  ~ "<= 3 t/ha",
-    Y_PDX <= 6  ~ "3-6 t/ha",
-    Y_PDX <= 9  ~ "6-9 t/ha"
-  )) %>%
-  na.omit(Y_PDX)
+    Y_PDX <= 3  ~ 1,
+    Y_PDX <= 6  ~ 2,
+    Y_PDX <= 9  ~ 3, 
+    Y_PDX > 9   ~ 4
+  ))
 
-#labs_plot_yield <- c("<= 3 t/ha", "3-6 t/ha", "6-9 t/ha")
+labs_plot_yield <- c("<= 3 t/ha", "3-6 t/ha", "6-9 t/ha", "> 9 t/ha")
+```
 
+```{r spatialmap, fig.align = "center", fig.cap= "The spatial distribution of salinity level in February in MKD for the period 2000-2020", echo = F} 
 graph_salinity <- data_full_wgps %>%
   ggplot(aes(x = long, y = lat, group = group, fill = as.factor(Salinity_in_Feb))) +
   geom_polygon(col = "grey20") +
   coord_map("polyconic") +
   theme_void() + 
   facet_wrap(~YEAR, ncol = 7)  +
-  scale_fill_grey(start = 1, end = 0, na.value = NA, label = labs_plot) +
+  scale_fill_brewer(palette = "Blues", na.value = NA, label = labs_plot) +
   labs(fill = "Salinty in Feb") +
   theme(legend.position = "bottom")
 print(graph_salinity)
 ```
 
-```{r spatialmap2, fig.align = "center", fig.cap= "The spatial distribution of paddy spring yield and salinity level in February in MKD for the period 2000-2020", echo = F}
-graph_salinity + 
-  geom_point(data = data_yield, aes(alpha = as.factor(Y_PDX_range), size = as.factor(Y_PDX_range)), pch = 21, fill = "grey80", col = "black") +
-  scale_size_manual(values = c(1, 2, 3, 4), na.value = NA) +
-  facet_wrap(~YEAR, ncol = 7) +
-  theme(legend.position = "bottom")
+```{r spatialmap2, out.width = '200%', fig.align = "center", fig.cap= "The spatial distribution of paddy spring yield and salinity level in February in MKD for the period 2000-2020", echo = F}
+data_full_2 <- Data_Full %>%
+  full_join(MKD_id, by = "DIST") %>%
+  filter(YEAR != 2021)
+
+data_full_2 <- data_full_2 %>%
+  mutate(Salinity_in_Feb = case_when(
+    SALT_FEB <= 2 ~ 1,
+    SALT_FEB <= 4 ~ 2,
+    SALT_FEB <= 6 ~ 3,
+    SALT_FEB > 6  ~ 4),
+    Y_PDX_range = case_when(
+    is.na(Y_PDX) ~ 1, 
+    Y_PDX <= 3  ~ 2,
+    Y_PDX <= 6  ~ 3,
+    Y_PDX <= 9  ~ 4
+  )
+  ) 
+
+data_biscale <- bi_class(data_full_2, x = Salinity_in_Feb, y = Y_PDX_range, style = "equal", dim = 4) 
+
+mkddata <- right_join(district_sf, data_biscale, by = c("adm_code"))
+
+i<- 7 
+
+mkd_map <- function(y) {
+  mkddata %>%
+  filter(YEAR == y) %>%
+  ggplot() +
+  geom_sf(mapping = aes(fill = bi_class), color = "black", size = 0.2, show.legend = F) +
+  bi_scale_fill(pal = "BlueOr", dim = 4) +
+  bi_theme(base_size = i) + 
+  ggtitle(y)
+}
+
+mkd_2000 <- mkd_map(2000)
+mkd_2001 <- mkd_map(2001)
+mkd_2002 <- mkd_map(2002)
+mkd_2003 <- mkd_map(2003)
+mkd_2004 <- mkd_map(2004)
+mkd_2005 <- mkd_map(2005)
+mkd_2006 <- mkd_map(2006)
+mkd_2007 <- mkd_map(2007)
+mkd_2008 <- mkd_map(2008)
+mkd_2009 <- mkd_map(2009)
+mkd_2010 <- mkd_map(2010)
+mkd_2011 <- mkd_map(2011)
+mkd_2012 <- mkd_map(2012)
+mkd_2013 <- mkd_map(2013)
+mkd_2014 <- mkd_map(2014)
+mkd_2015 <- mkd_map(2015)
+mkd_2016 <- mkd_map(2016)
+mkd_2017 <- mkd_map(2017)
+mkd_2018 <- mkd_map(2018)
+mkd_2019 <- mkd_map(2019)
+mkd_2020 <- mkd_map(2020)
+
+legend <- bi_legend(pal = "BlueOr",
+                    dim = 4,
+                    xlab = "      Salinity Levles",
+                    ylab = "      Yield",
+                    size = 8,
+                    pad_width = .2,
+                    pad_color = "black") + 
+  bi_theme(bg_color = "transparent",
+           base_size = 8)
+
+ggdraw() +
+  draw_plot(gridExtra::grid.arrange(mkd_2000, mkd_2001, mkd_2002, mkd_2003, mkd_2004, 
+                               mkd_2005, mkd_2006, mkd_2007, mkd_2008, mkd_2009,
+                               mkd_2010, mkd_2011, mkd_2012, mkd_2013, mkd_2014,
+                               mkd_2015, mkd_2016, mkd_2017, mkd_2018, mkd_2019,
+                               mkd_2020, ncol=6)) +
+  draw_plot(legend, 0.8, 0.003, 0.2, 0.2)
 ```
