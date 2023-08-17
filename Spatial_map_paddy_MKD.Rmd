@@ -4,9 +4,9 @@ author:
 name: Huong Nguyen  
 affiliation: AAED Department, Virginia Tech
 
-output: html_document
+output: pdf_document
 classoption: landscape
-geometry: margin=0in
+geometry: margin=0.5in
 ---
 
 ```{r setup, include = FALSE}
@@ -212,19 +212,6 @@ mkd_map <- function(y) {
   theme(plot.margin=unit(c(0,0,0,0), 'cm'))
 }
 
-years <- Data_Full %>% 
-  distinct(YEAR) %>%
-  mutate(YEAR = as.character(YEAR))
-
-year <- array(data = unlist(years))
-
-#all_plots2 = map(year, function(mapmkd) {
-#     map(
-#          mkd_map(year)
-#     )
-#})
-
-
 mkd_2000 <- mkd_map(2000)
 mkd_2001 <- mkd_map(2001)
 mkd_2002 <- mkd_map(2002)
@@ -250,7 +237,7 @@ mkd_2020 <- mkd_map(2020)
 legend <- bi_legend(pal = "BlueOr",
                     dim = 4,
                     xlab = "      Salinity Levles",
-                    ylab = "      Yield",
+                    ylab = "  Yield",
                     size = 8,
                     pad_width = .2,
                     pad_color = "black") + 
@@ -263,6 +250,6 @@ ggdraw() +
                                mkd_2010, mkd_2011, mkd_2012, mkd_2013, mkd_2014,
                                mkd_2015, mkd_2016, mkd_2017, mkd_2018, mkd_2019,
                                mkd_2020, ncol=6)) +
-  draw_plot(legend, 0.8, 0.005, 0.2, 0.2) +
+  draw_plot(legend, 0.8, 0.01, 0.2, 0.2) +
   theme(plot.margin=unit(c(0,0,0,0), 'cm'))
 ```
