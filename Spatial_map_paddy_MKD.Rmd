@@ -4,7 +4,7 @@ author:
 name: Huong Nguyen  
 affiliation: AAED Department, Virginia Tech
 
-output: pdf_document
+output: html_document
 classoption: landscape
 geometry: margin=0in
 ---
@@ -42,7 +42,9 @@ theme_set(theme_classic() + theme(legend.position="bottom") )
 knitr::opts_chunk$set(echo = TRUE, 
                       message = FALSE,
                       warning = FALSE, 
+                      fig.width = 7.5,
                       fig.align="center",
+                      fig.margin=unit(c(0,0,0,0), 'cm'),
                       global.par = TRUE) 
 knitr::opts_chunk$set(number_sections = FALSE)
 ```
@@ -141,7 +143,7 @@ data_full_wgps <- data_full_wgps %>%
     SALT_FEB <= 6 ~ 3,
     SALT_FEB > 6  ~ 4))
     
-labs_plot <- c("<= 1 g/lt.", "1-2 g/lt.", "2-3 g/lt.", "3-4 g/lt.", "4-10 g/lt.", "10-30 g/lt.")
+labs_plot <- c("<= 2 g/lt.", "2-4 g/lt.", "4-6 g/lt.", "> 6 g/lt.")
 
 #br2 <- c(0, 3, 5, 7, 9)
 data_full_wgps <- data_full_wgps %>%
@@ -161,11 +163,12 @@ labs_plot_yield <- c("<= 3 t/ha", "3-6 t/ha", "6-9 t/ha", "> 9 t/ha")
 
 ```{r spatialmap, fig.align = "center", fig.cap= "The spatial distribution of salinity level in February in MKD for the period 2000-2020", echo = F} 
 graph_salinity <- data_full_wgps %>%
+  filter(laa != "Phu Quoc" & pop > 0) %>%
   ggplot(aes(x = long, y = lat, group = group, fill = as.factor(Salinity_in_Feb))) +
   geom_polygon(col = "grey20") +
   coord_map("polyconic") +
   theme_void() + 
-  facet_wrap(~YEAR, ncol = 7)  +
+  facet_wrap(~YEAR, ncol = 6)  +
   scale_fill_brewer(palette = "Blues", na.value = NA, label = labs_plot) +
   labs(fill = "Salinty in Feb") +
   theme(legend.position = "bottom")
@@ -193,19 +196,34 @@ data_full_2 <- data_full_2 %>%
 
 data_biscale <- bi_class(data_full_2, x = Salinity_in_Feb, y = Y_PDX_range, style = "equal", dim = 4) 
 
-mkddata <- right_join(district_sf, data_biscale, by = c("adm_code"))
+mkddata <- right_join(district_sf, data_biscale, by = c("adm_code")) %>%
+  filter(laa != "Phu Quoc" & pop >0)
 
 i<- 7 
 
 mkd_map <- function(y) {
   mkddata %>%
-  filter(YEAR == y) %>%
+  filter(YEAR == as.numeric(y)) %>%
   ggplot() +
   geom_sf(mapping = aes(fill = bi_class), color = "black", size = 0.2, show.legend = F) +
   bi_scale_fill(pal = "BlueOr", dim = 4) +
   bi_theme(base_size = i) + 
-  ggtitle(y)
+  ggtitle(y) + 
+  theme(plot.margin=unit(c(0,0,0,0), 'cm'))
 }
+
+years <- Data_Full %>% 
+  distinct(YEAR) %>%
+  mutate(YEAR = as.character(YEAR))
+
+year <- array(data = unlist(years))
+
+#all_plots2 = map(year, function(mapmkd) {
+#     map(
+#          mkd_map(year)
+#     )
+#})
+
 
 mkd_2000 <- mkd_map(2000)
 mkd_2001 <- mkd_map(2001)
@@ -240,10 +258,11 @@ legend <- bi_legend(pal = "BlueOr",
            base_size = 8)
 
 ggdraw() +
-  draw_plot(gridExtra::grid.arrange(mkd_2000, mkd_2001, mkd_2002, mkd_2003, mkd_2004, 
+  draw_plot(cowplot::plot_grid(mkd_2000, mkd_2001, mkd_2002, mkd_2003, mkd_2004, 
                                mkd_2005, mkd_2006, mkd_2007, mkd_2008, mkd_2009,
                                mkd_2010, mkd_2011, mkd_2012, mkd_2013, mkd_2014,
                                mkd_2015, mkd_2016, mkd_2017, mkd_2018, mkd_2019,
                                mkd_2020, ncol=6)) +
-  draw_plot(legend, 0.8, 0.003, 0.2, 0.2)
+  draw_plot(legend, 0.8, 0.005, 0.2, 0.2) +
+  theme(plot.margin=unit(c(0,0,0,0), 'cm'))
 ```
